@@ -1,12 +1,13 @@
 from selenium import webdriver
 from selenium.webdriver import Keys, ActionChains
 from selenium.webdriver.common.by import By
-from time import strftime, gmtime, strptime, sleep
+from time import strftime, localtime, strptime, sleep
 import sys
 import os
 
 TARGET_URL = "https://lapalabradeldia.com"
 TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
+LOGGING = False
 
 def extract_timestamp(filename):
     timestamp = filename.replace("backup_","").replace(".txt","")
@@ -14,14 +15,16 @@ def extract_timestamp(filename):
 
 def load_backup(backup_dir):
     if not os.path.lexists(backup_dir):
-        print(f"The directory '{backup_dir}' doesn't exist, creating it...")
+        if LOGGING:
+            print(f"The directory '{backup_dir}' doesn't exist, creating it...")
         os.mkdir(backup_dir)
         return TARGET_URL
 
     files = os.listdir(backup_dir)
     files = [f for f in files if os.path.isfile(os.path.join(backup_dir, f))]
     if len(files) == 0:
-        print("Couldn't find any backup, going to main page...")
+        if LOGGING:
+            print("Couldn't find any backup, going to main page...")
         return TARGET_URL
     backup = max(files, key=extract_timestamp)
     with open(backup_dir + "/" +  backup, "r") as f:
@@ -29,12 +32,14 @@ def load_backup(backup_dir):
 
 def create_backup(backup_dir, backup_url):
     if not os.path.lexists(backup_dir):
-        print(f"The directory '{backup_dir}' doesn't exist, creating it...")
+        if LOGGING:
+            print(f"The directory '{backup_dir}' doesn't exist, creating it...")
         os.mkdir(backup_dir)
 
     # File format: backup_YY-mm-dd_HH-MM-SS.txt
-    filename = backup_dir + "/backup_" + strftime(TIMESTAMP_FORMAT, gmtime()) + ".txt"
-    print(f"Creating the backup in '{filename}'")
+    filename = backup_dir + "/backup_" + strftime(TIMESTAMP_FORMAT, localtime()) + ".txt"
+    if LOGGING:
+        print(f"Creating the backup in '{filename}'")
     with open(filename, "w") as f:
         f.write(backup_url)
 
@@ -51,6 +56,8 @@ def get_backup_url(driver):
     ActionChains(driver).send_keys(Keys.ENTER).perform()
     ActionChains(driver).send_keys(Keys.TAB).perform()
     ActionChains(driver).send_keys(Keys.ENTER).perform()
+    # Sleep a little to assure that the url is correct
+    sleep(2)
     return driver.current_url
 
 def config_driver():
@@ -64,7 +71,8 @@ def config_driver():
     return driver
 
 def reject_cookies(driver):
-    print("Rejecting cookies...")
+    if LOGGING:
+        print("Rejecting cookies...")
 
     # Find and click manage options button
     elements = driver.find_elements(By.TAG_NAME, "p")
@@ -102,17 +110,22 @@ def reject_cookies(driver):
         if button_label.text == "Confirm choices":
             button_label.click()
 
-    print("Cookies rejected!")
+    if LOGGING:
+        print("Cookies rejected!")
 
 def start_guessing():
-    print("""
-    How to play:
-    - "quit" "-q"        Quits the game
-    - "delete" "-d"      Deletes the word
-    Anything else will be typed
-    """)
+    if LOGGING:
+        print("""
+        How to play:
+        - "quit" "-q"        Quits the game
+        - "delete" "-d"      Deletes the word
+        Anything else will be typed
+        """)
     while True:
-        guessing = input("Guess the word: ")
+        if LOGGING:
+            guessing = input("Guess the word: ")
+        else:
+            guessing = input()
         if guessing == "quit":
             break
         if guessing == "delete":
@@ -134,7 +147,8 @@ if __name__ == "__main__":
     try:
         driver = config_driver()
     except:
-        print("Couldn't find the browser")
+        if LOGGING:
+            print("Couldn't find the browser")
         sys.exit(1)
 
     driver.get(TARGET_URL)
@@ -143,7 +157,8 @@ if __name__ == "__main__":
     try:
         reject_cookies(driver)
     except:
-        print("Something wrong happened while rejecting cookies")
+        if LOGGING:
+            print("Something wrong happened while rejecting cookies")
         driver.quit()
         sys.exit(1)
 
@@ -157,12 +172,14 @@ if __name__ == "__main__":
     if option[0] == "y":
         url = load_backup(backup_dir)
         driver.get(url)
-        print(f"Stats imported! Going back to {TARGET_URL}")
+        if LOGGING:
+            print(f"Stats imported! Going back to {TARGET_URL}")
 
     driver.get(TARGET_URL)
     ActionChains(driver).send_keys(Keys.ESCAPE).perform()
 
-    start_guessing()
+    #start_guessing()
+    sleep(120)
 
     # Save backup by default
     if True:
@@ -174,5 +191,7 @@ if __name__ == "__main__":
     if option[0] == "y":
         create_backup(backup_dir, get_backup_url(driver))
 
-    print("See you!")
+    print("- " + strftime("%Y-%m-%d %H:%M:%S", localtime()) + ": " + driver.current_url)
+    if LOGGING:
+        print("See you!")
     driver.quit()
